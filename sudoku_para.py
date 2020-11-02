@@ -75,7 +75,7 @@ def add_possibility(possibility, cover, cover_row, grid_width=9, block_width=3):
     cover[cover_row, 3 * grid_width * grid_width + block_idx * grid_width + n - 1] = 1
 
 
-def solve(cover, active_rows, active_cols, solution: list):
+def solve(cover, cover_cpu, active_rows, active_cols, solution: list):
     """
     solves the exact cover problem with algorithm-x.
     See https://en.wikipedia.org/wiki/Knuth%27s_Algorithm_X for the high level algorithm
@@ -103,10 +103,10 @@ def solve(cover, active_rows, active_cols, solution: list):
         solution.append(int(row))
         # track removed rows and columns so we can easily add them back if we need
         # to backtrack
-        removed_rows, removed_cols = select(row, cover, active_rows, active_cols)
+        removed_rows, removed_cols = select(int(row), cover_cpu, active_rows, active_cols)
         active_rows = [e for e in active_rows if e not in removed_rows]
         active_cols = [e for e in active_cols if e not in removed_cols]
-        solved = solve(cover, active_rows, active_cols, solution)
+        solved = solve(cover, cover_cpu, active_rows, active_cols, solution)
         if solved:
             return True
         # not solved: backtrack
@@ -126,19 +126,19 @@ def select(row, cover, active_rows, active_cols):
     """
     removed_rows = []
     removed_cols = []
-    active_cols_vect, active_rows_vect = vect_from_active(active_cols, active_rows, cover)
-    for col in cp.nonzero(active_cols_vect * cover[row, :])[0]:
-        removed_rows += cp.nonzero(active_rows_vect * cover[:, col])[0].tolist()
-        # for row2 in cp.nonzero(active_rows_vect * cover[:, col])[0]:
-        #     removed_rows.append(int(row2))
-        # now remove the column because we just covered `row` just covered it.
+    active_cols_vect, active_rows_vect = vect_from_active(
+        active_cols, active_rows, cover
+    )
+    for col in np.nonzero(active_cols_vect * cover[row, :])[0]:
+        removed_rows += np.nonzero(active_rows_vect * cover[:, col])[0].tolist()
+        # remove the column because `row` just covered it.
         removed_cols.append(int(col))
     return removed_rows, removed_cols
 
 
 def vect_from_active(active_cols, active_rows, cover):
-    active_cols_vect = cp.zeros(cover.shape[1])
-    active_rows_vect = cp.zeros(cover.shape[0])
+    active_cols_vect = np.zeros(cover.shape[1])
+    active_rows_vect = np.zeros(cover.shape[0])
     active_cols_vect[active_cols] = 1
     active_rows_vect[active_rows] = 1
     return active_cols_vect, active_rows_vect
@@ -197,6 +197,7 @@ def main():
     start = timer()
     solved = solve(
         cover,
+        cp.asnumpy(cover),
         list(range(cover.shape[0])),
         list(range(cover.shape[1])),
         solution=solution,
