@@ -1,7 +1,7 @@
 from timeit import default_timer as timer
 
-import cupy as np  # TODO
 import cupy as cp
+import numpy as np
 
 
 def create_cover(sudoku, grid_width=9, block_width=3):
@@ -13,13 +13,13 @@ def create_cover(sudoku, grid_width=9, block_width=3):
     :return: the relationship matrix (called a cover)
     """
     g_len = sudoku.shape[0]  # grid side length
-    n_non_zeros = int(np.count_nonzero(sudoku))
+    n_non_zeros = int(cp.count_nonzero(sudoku))
     # N_possibilities = #_of_zeros * numbers_per_row + #_of_non_zeros
     n_possibilities = (g_len * g_len - n_non_zeros) * g_len + n_non_zeros
     # There are 4 types of constraints and each type has g_len * g_len constraints
     n_constrains = 4 * g_len * g_len
     # cover stores the 0-1 relationships that Algorithm-X uses
-    cover = np.zeros((n_possibilities, n_constrains))
+    cover = cp.zeros((n_possibilities, n_constrains))
     # possibilities stores the 'name' of a possibility (row, col, number) such that
     # possibilities[i] is the name for row i in cover. This is used to fill in the
     # sudoku at the end
@@ -97,9 +97,9 @@ def solve(cover, active_rows, active_cols, solution: list):
     if count == 0:
         print("backtrack!")
         return False
-    active_rows_vect = np.zeros(cover.shape[0])
+    active_rows_vect = cp.zeros(cover.shape[0])
     active_rows_vect[active_rows] = 1
-    for row in np.nonzero(active_rows_vect * cover[:, col])[0]:
+    for row in cp.nonzero(active_rows_vect * cover[:, col])[0]:
         solution.append(int(row))
         # track removed rows and columns so we can easily add them back if we need
         # to backtrack
@@ -126,16 +126,22 @@ def select(row, cover, active_rows, active_cols):
     """
     removed_rows = []
     removed_cols = []
-    active_cols_vect = np.zeros(cover.shape[1])
-    active_rows_vect = np.zeros(cover.shape[0])
-    active_cols_vect[active_cols] = 1
-    active_rows_vect[active_rows] = 1
-    for col in np.nonzero(active_cols_vect * cover[row, :])[0]:
-        for row2 in np.nonzero(active_rows_vect * cover[:, col])[0]:
-            removed_rows.append(int(row2))
+    active_cols_vect, active_rows_vect = vect_from_active(active_cols, active_rows, cover)
+    for col in cp.nonzero(active_cols_vect * cover[row, :])[0]:
+        removed_rows += cp.nonzero(active_rows_vect * cover[:, col])[0].tolist()
+        # for row2 in cp.nonzero(active_rows_vect * cover[:, col])[0]:
+        #     removed_rows.append(int(row2))
         # now remove the column because we just covered `row` just covered it.
         removed_cols.append(int(col))
     return removed_rows, removed_cols
+
+
+def vect_from_active(active_cols, active_rows, cover):
+    active_cols_vect = cp.zeros(cover.shape[1])
+    active_rows_vect = cp.zeros(cover.shape[0])
+    active_cols_vect[active_cols] = 1
+    active_rows_vect[active_rows] = 1
+    return active_cols_vect, active_rows_vect
 
 
 def deselect(removed_rows, removed_cols, active_rows, active_cols):
@@ -182,7 +188,7 @@ def main():
     #     ]
     # )
     size = 5
-    sudoku = np.zeros((size * size, size * size), dtype=np.uint8)
+    sudoku = cp.zeros((size * size, size * size), dtype=cp.uint8)
 
     cover, possibilities = create_cover(
         sudoku, grid_width=size * size, block_width=size
