@@ -169,7 +169,7 @@ def min_col(cover, active_rows, active_cols):
 
 
 def col_counts(r, active_rows, active_cols):
-    return np.sum(r[active_rows == 1, :], axis=0) * active_cols
+    return np.sum(r[active_rows == 1, :], axis=0)
 
 
 def print_grid(grid):

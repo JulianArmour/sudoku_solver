@@ -104,8 +104,8 @@ def solve(cover, active_rows, active_cols, solution: list):
         # track removed rows and columns so we can easily add them back if we need
         # to backtrack
         removed_rows, removed_cols = select(row, cover, active_rows, active_cols)
-        active_rows = list(set(active_rows) - set(removed_rows))
-        active_cols = list(set(active_cols) - set(removed_cols))
+        active_rows = [e for e in active_rows if e not in removed_rows]
+        active_cols = [e for e in active_cols if e not in removed_cols]
         solved = solve(cover, active_rows, active_cols, solution)
         if solved:
             return True
