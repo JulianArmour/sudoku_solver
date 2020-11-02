@@ -1,6 +1,6 @@
 from timeit import default_timer as timer
 
-import cupy as np # TODO
+import cupy as np  # TODO
 import cupy as cp
 
 
@@ -88,7 +88,7 @@ def solve(cover, active_rows, active_cols, solution: list):
     :return: True if the algorithm successfully found a solution.
     """
     # no active columns means the solution is found.
-    if np.sum(active_cols) == 0:
+    if len(active_cols) == 0:
         return True
     # pick the column with the lest number of 1s. This is a heuristic to speed up the
     # algorithm (and is extremely effective for sudoku).
@@ -97,11 +97,15 @@ def solve(cover, active_rows, active_cols, solution: list):
     if count == 0:
         print("backtrack!")
         return False
-    for row in np.nonzero(active_rows * cover[:, col])[0]:
+    active_rows_vect = np.zeros(cover.shape[0])
+    active_rows_vect[active_rows] = 1
+    for row in np.nonzero(active_rows_vect * cover[:, col])[0]:
         solution.append(int(row))
         # track removed rows and columns so we can easily add them back if we need
         # to backtrack
         removed_rows, removed_cols = select(row, cover, active_rows, active_cols)
+        active_rows = list(set(active_rows) - set(removed_rows))
+        active_cols = list(set(active_cols) - set(removed_cols))
         solved = solve(cover, active_rows, active_cols, solution)
         if solved:
             return True
@@ -120,15 +124,17 @@ def select(row, cover, active_rows, active_cols):
     :return: a tuple (removed_rows, removed_cols) which are numpy arrays containing a
     1 if the row/column was removed or 0 otherwise.
     """
-    removed_rows = np.zeros(active_rows.shape[0], dtype=np.int8)
-    removed_cols = np.zeros(active_cols.shape[0], dtype=np.int8)
-    for col in np.nonzero(active_cols * cover[row, :])[0]:
-        for row2 in np.nonzero(active_rows * cover[:, col])[0]:
-            active_rows[row2] = 0
-            removed_rows[row2] = 1
+    removed_rows = []
+    removed_cols = []
+    active_cols_vect = np.zeros(cover.shape[1])
+    active_rows_vect = np.zeros(cover.shape[0])
+    active_cols_vect[active_cols] = 1
+    active_rows_vect[active_rows] = 1
+    for col in np.nonzero(active_cols_vect * cover[row, :])[0]:
+        for row2 in np.nonzero(active_rows_vect * cover[:, col])[0]:
+            removed_rows.append(int(row2))
         # now remove the column because we just covered `row` just covered it.
-        active_cols[col] = 0
-        removed_cols[col] = 1
+        removed_cols.append(int(col))
     return removed_rows, removed_cols
 
 
@@ -146,13 +152,12 @@ def min_col(cover, active_rows, active_cols):
     compared to other columns.
     """
     counts = col_counts(cover, active_rows)
-    active_col_indices = active_cols.nonzero()[0]
-    argmin = active_col_indices[cp.argmin(counts[active_col_indices])]
+    argmin = active_cols[int(cp.argmin(counts[active_cols]))]
     return argmin, counts[argmin]
 
 
 def col_counts(r, active_rows):
-    return cp.sum(r[active_rows == 1, :], axis=0)
+    return cp.sum(r[active_rows, :], axis=0)
 
 
 def print_grid(grid):
@@ -186,8 +191,8 @@ def main():
     start = timer()
     solved = solve(
         cover,
-        np.ones(cover.shape[0], dtype=np.int8),
-        np.ones(cover.shape[1], dtype=np.int8),
+        list(range(cover.shape[0])),
+        list(range(cover.shape[1])),
         solution=solution,
     )
     end = timer()
