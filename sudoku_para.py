@@ -97,21 +97,22 @@ def solve(cover, cover_cpu, active_rows, active_cols, solution: list):
     if count == 0:
         print("backtrack!")
         return False
-    active_rows_vect = cp.zeros(cover.shape[0])
-    active_rows_vect[active_rows] = 1
-    for row in cp.nonzero(active_rows_vect * cover[:, col])[0]:
+    active_rows_np = np.array(active_rows)[np.flatnonzero(cover_cpu[active_rows, col])]
+    for row in active_rows_np:
         solution.append(int(row))
         # track removed rows and columns so we can easily add them back if we need
         # to backtrack
-        removed_rows, removed_cols = select(int(row), cover_cpu, active_rows, active_cols)
-        active_rows = [e for e in active_rows if e not in removed_rows]
-        active_cols = [e for e in active_cols if e not in removed_cols]
+        rows_to_remove, cols_to_remove = select(
+            int(row), cover_cpu, active_rows, active_cols
+        )
+        active_rows = np.setdiff1d(np.array(active_rows), rows_to_remove).tolist()
+        active_cols = np.setdiff1d(np.array(active_cols), cols_to_remove).tolist()
         solved = solve(cover, cover_cpu, active_rows, active_cols, solution)
         if solved:
             return True
         # not solved: backtrack
         solution.pop()
-        deselect(removed_rows, removed_cols, active_rows, active_cols)
+        deselect(rows_to_remove, cols_to_remove, active_rows, active_cols)
 
 
 def select(row, cover, active_rows, active_cols):
@@ -124,32 +125,21 @@ def select(row, cover, active_rows, active_cols):
     :return: a tuple (removed_rows, removed_cols) which are numpy arrays containing a
     1 if the row/column was removed or 0 otherwise.
     """
-    removed_rows = []
-    removed_cols = []
-    active_cols_vect, active_rows_vect = vect_from_active(
-        active_cols, active_rows, cover
-    )
-    for col in np.nonzero(active_cols_vect * cover[row, :])[0]:
-        removed_rows += np.nonzero(active_rows_vect * cover[:, col])[0].tolist()
-        # remove the column because `row` just covered it.
-        removed_cols.append(int(col))
-    return removed_rows, removed_cols
-
-
-def vect_from_active(active_cols, active_rows, cover):
-    active_cols_vect = np.zeros(cover.shape[1])
-    active_rows_vect = np.zeros(cover.shape[0])
-    active_cols_vect[active_cols] = 1
-    active_rows_vect[active_rows] = 1
-    return active_cols_vect, active_rows_vect
+    active_rows = np.array(active_rows)
+    active_cols = np.array(active_cols)
+    columns_to_remove = active_cols[np.nonzero(cover[row, active_cols])[0]]
+    rows_to_remove = active_rows[
+        np.unique(np.nonzero(cover[np.ix_(active_rows, columns_to_remove)])[0])
+    ]
+    return rows_to_remove, columns_to_remove
 
 
 def deselect(removed_rows, removed_cols, active_rows, active_cols):
     """
     restore rows and columns that were removed with select()
     """
-    active_rows += removed_rows
-    active_cols += removed_cols
+    active_rows += removed_rows.tolist()
+    active_cols += removed_cols.tolist()
 
 
 def min_col(cover, active_rows, active_cols):
@@ -162,8 +152,8 @@ def min_col(cover, active_rows, active_cols):
     return argmin, counts[argmin]
 
 
-def col_counts(r, active_rows):
-    return cp.sum(r[active_rows, :], axis=0)
+def col_counts(cover, active_rows):
+    return cp.sum(cover[active_rows, :], axis=0)
 
 
 def print_grid(grid):

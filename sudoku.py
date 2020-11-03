@@ -123,18 +123,15 @@ def select(row, cover, active_rows, active_cols):
     """
     removed_rows = np.zeros(active_rows.shape[0])
     removed_cols = np.zeros(active_cols.shape[0])
-    for col in np.nonzero(active_cols * cover[row, :])[0]:
-        # if active_cols[col] == 0 or cover[row, col] == 0:
-        #     continue
-        # at this point: cover[row, col] is 1. Remove other rows that have a 1 in this
-        # column.
-        for row2 in np.nonzero(active_rows * cover[:, col])[0]:
-            # if active_rows[row2] == 1 and cover[row2, col] == 1:
-            active_rows[row2] = 0
-            removed_rows[row2] = 1
-        # now remove the column because we just covered `row` just covered it.
-        active_cols[col] = 0
-        removed_cols[col] = 1
+    columns_to_remove = np.nonzero(active_cols * cover[row, :])[0]
+    # remove rows that have a 1 in a column that's being removed
+    for col in columns_to_remove:
+        rows_to_remove = np.nonzero(active_rows * cover[:, col])[0]
+        active_rows[rows_to_remove] = 0
+        removed_rows[rows_to_remove] = 1
+    # now remove the column because `row` just covered it.
+    active_cols[columns_to_remove] = 0
+    removed_cols[columns_to_remove] = 1
     return removed_rows, removed_cols
 
 
@@ -145,31 +142,20 @@ def deselect(removed_rows, removed_cols, active_rows, active_cols):
     active_rows += removed_rows
     active_cols += removed_cols
 
-    # for i in range(removed_rows.shape[0]):
-    #     if removed_rows[i] == 1:
-    #         active_rows[i] = 1
-    # for i in range(removed_cols.shape[0]):
-    #     if removed_cols[i] == 1:
-    #         active_cols[i] = 1
-
 
 def min_col(cover, active_rows, active_cols):
     """
     :return: (column, count) tuple such that column contains the least number of 1s
     compared to other columns.
     """
-    counts = col_counts(cover, active_rows, active_cols)
-    argmin = -1
-    for i in range(counts.shape[0]):
-        if active_cols[i] == 0:
-            continue
-        if argmin == -1 or counts[i] < counts[argmin]:
-            argmin = i
+    active_col_indices = np.flatnonzero(active_cols)
+    counts = col_counts(cover, np.flatnonzero(active_rows))
+    argmin = active_col_indices[int(np.argmin(counts[active_col_indices]))]
     return argmin, counts[argmin]
 
 
-def col_counts(r, active_rows, active_cols):
-    return np.sum(r[active_rows == 1, :], axis=0)
+def col_counts(r, active_row_indices):
+    return np.sum(r[active_row_indices, :], axis=0)
 
 
 def print_grid(grid):
@@ -196,7 +182,9 @@ def main():
     size = 5
     sudoku = np.zeros((size * size, size * size), dtype=np.uint8)
 
-    cover, possibilities = create_cover(sudoku, grid_width=size*size, block_width=size)
+    cover, possibilities = create_cover(
+        sudoku, grid_width=size * size, block_width=size
+    )
     solution = []
     start = timer()
     solved = solve(
