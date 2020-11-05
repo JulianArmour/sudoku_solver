@@ -1,3 +1,4 @@
+import os
 import time
 from os import system
 from timeit import default_timer as timer
@@ -76,7 +77,7 @@ def add_possibility(possibility, cover, cover_row, grid_width=9, block_width=3):
     cover[cover_row, 3 * grid_width * grid_width + block_idx * grid_width + n - 1] = 1
 
 
-def solve(cover, active_rows, active_cols, solution: list):
+def solve(cover, active_rows, active_cols, solution: list, solution_path: list):
     """
     solves the exact cover problem with algorithm-x.
     See https://en.wikipedia.org/wiki/Knuth%27s_Algorithm_X for the high level algorithm
@@ -100,14 +101,16 @@ def solve(cover, active_rows, active_cols, solution: list):
         return False
     for row in np.nonzero(active_rows * cover[:, col])[0]:
         solution.append(row)
+        solution_path.append((1, row))  # 1 denotes selecting this row
         # track removed rows and columns so we can easily add them back if we need
         # to backtrack
         removed_rows, removed_cols = select(row, cover, active_rows, active_cols)
-        solved = solve(cover, active_rows, active_cols, solution)
+        solved = solve(cover, active_rows, active_cols, solution, solution_path)
         if solved:
             return True
         # not solved: backtrack
         solution.pop()
+        solution_path.append((0, row))  # 0 denotes deselecting this row
         deselect(removed_rows, removed_cols, active_rows, active_cols)
 
 
@@ -158,48 +161,85 @@ def col_counts(r, active_row_indices):
     return np.sum(r[active_row_indices, :], axis=0)
 
 
-def print_grid(grid):
-    for i in range(grid.shape[0]):
-        for j in range(grid.shape[1]):
-            print(grid[i, j] if grid[i, j] != 0 else "_", end=" ")
+def print_sudoku(s):
+    for i in range(s.shape[0]):
+        for j in range(s.shape[1]):
+            n = s[i, j]
+            if n == 0:
+                print("__", end=" ")
+            elif n < 10:
+                print(f" {n}", end=" ")
+            else:
+                print(n, end=" ")
         print()
+    print()
 
 
-def main():
-    # sudoku = np.array(
-    #     [
-    #         [0,18,15,9,0,21,0,0,0,0,0,0,22,1,0,0,5,0,14,0,12,0,0,13,7],
-    #         [23,0,0,4,0,0,0,11,0,0,0,25,24,0,0,18,0,0,20,0,6,0,0,0,0],
-    #         [],
-    #         [8, 3, 0, 6, 0, 0, 0, 0, 0],
-    #         [0, 0, 0, 9, 0, 0, 1, 0, 0],
-    #         [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    #         [5, 0, 7, 0, 0, 0, 3, 0, 0],
-    #         [0, 0, 0, 3, 0, 2, 0, 0, 0],
-    #         [1, 0, 0, 0, 0, 0, 0, 0, 0],
-    #     ]
-    # )
-    size = 5
-    sudoku = np.zeros((size * size, size * size), dtype=np.uint8)
-
+def solve_sudoku(sudoku: np.array, grid_width=9, block_width=3):
     cover, possibilities = create_cover(
-        sudoku, grid_width=size * size, block_width=size
+        sudoku, grid_width=grid_width, block_width=block_width
     )
     solution = []
+    solution_path = []
     start = timer()
     solved = solve(
-        cover, np.ones(cover.shape[0]), np.ones(cover.shape[1]), solution=solution
+        cover,
+        np.ones(cover.shape[0]),
+        np.ones(cover.shape[1]),
+        solution,
+        solution_path
     )
-    end = timer()
-    print(f"Solved in {end - start} seconds")
+    solving_time = timer() - start
     if solved:
-        for sol in solution:
-            row, col, n = possibilities[sol]
-            sudoku[row, col] = n
-        print_grid(sudoku)
-    else:
-        print("No solution exists :(")
+        completed_sudoku = build_final_sudoku(possibilities, solution, sudoku)
+        sudoku_solution_path = build_solving_path(possibilities, solution_path)
+        return completed_sudoku, solving_time, sudoku_solution_path
+    return None, solving_time, None
+
+
+def build_solving_path(possibilities, solution_path):
+    """
+    :return: an (operation_type, row, col, n) tuple list that represents the path
+    the algorithm took to solve the algorithm. "ins" means the algorithm inserted
+    number "n" into sudoku[row, col]
+    """
+    sudoku_solution_path = []
+    for action, cover_row in solution_path:
+        row, col, n = possibilities[cover_row]
+        if action == 1:
+            sudoku_solution_path.append(("ins", row, col, n))
+        else:
+            sudoku_solution_path.append(("rem", row, col, n))
+    return sudoku_solution_path
+
+
+def build_final_sudoku(possibilities, solution, sudoku):
+    """
+    :return: the completed sudoku
+    """
+    final = np.zeros_like(sudoku)
+    for sol in solution:
+        row, col, n = possibilities[sol]
+        final[row, col] = n
+    return final
 
 
 if __name__ == "__main__":
-    main()
+    _sudoku = np.zeros((16, 16), dtype=np.uint8)
+    _completed_sudoku, _solving_time, _sudoku_solution_path = solve_sudoku(
+        _sudoku, grid_width=16, block_width=4
+    )
+    if _completed_sudoku is None:
+        print("No solution found :(")
+    else:
+        for _action, _row, _col, _n in _sudoku_solution_path:
+            os.system("cls")
+            if _action == "ins":
+                _sudoku[_row, _col] = _n
+                print_sudoku(_sudoku)
+            else:
+                _sudoku[_row, _col] = 0
+                print_sudoku(_sudoku)
+            time.sleep(0.05)
+        # print_grid(_sudoku)
+        print(f"solved in {_solving_time}")

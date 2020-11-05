@@ -1,10 +1,12 @@
+import os
+import time
 from timeit import default_timer as timer
 
 import cupy as cp
 import numpy as np
 
 
-def create_cover(sudoku, grid_width=9, block_width=3):
+def create_cover(sudoku: np.array, grid_width=9, block_width=3):
     """
     Creates the relationship matrix used by algorithm-x
     :param sudoku: the sudoku matrix (2-d numpy array)
@@ -13,13 +15,13 @@ def create_cover(sudoku, grid_width=9, block_width=3):
     :return: the relationship matrix (called a cover)
     """
     g_len = sudoku.shape[0]  # grid side length
-    n_non_zeros = int(cp.count_nonzero(sudoku))
+    n_non_zeros = int(np.count_nonzero(sudoku))
     # N_possibilities = #_of_zeros * numbers_per_row + #_of_non_zeros
     n_possibilities = (g_len * g_len - n_non_zeros) * g_len + n_non_zeros
     # There are 4 types of constraints and each type has g_len * g_len constraints
     n_constrains = 4 * g_len * g_len
     # cover stores the 0-1 relationships that Algorithm-X uses
-    cover = cp.zeros((n_possibilities, n_constrains))
+    cover = np.zeros((n_possibilities, n_constrains))
     # possibilities stores the 'name' of a possibility (row, col, number) such that
     # possibilities[i] is the name for row i in cover. This is used to fill in the
     # sudoku at the end
@@ -40,6 +42,7 @@ def create_cover(sudoku, grid_width=9, block_width=3):
                 )
                 possibilities.append(possibility)
                 continue
+            # (row,col) is an empty slot, so add all possibilities for this slot
             for n in range(1, grid_width + 1):
                 possibility = (row, col, n)
                 add_possibility(
@@ -75,16 +78,18 @@ def add_possibility(possibility, cover, cover_row, grid_width=9, block_width=3):
     cover[cover_row, 3 * grid_width * grid_width + block_idx * grid_width + n - 1] = 1
 
 
-def solve(cover, cover_cpu, active_rows, active_cols, solution: list):
+def solve(cover_gpu, cover_cpu, active_rows, active_cols, solution, solution_path):
     """
     solves the exact cover problem with algorithm-x.
     See https://en.wikipedia.org/wiki/Knuth%27s_Algorithm_X for the high level algorithm
-    :param cover: the cover.
+    :param cover_gpu: the cover.
     :param active_rows: a vector representing which rows haven't and have been removed.
     # this is used for efficiency's sake. Rather than creating a whole new matrix
     # at each iteration when we remove row i, we simply set a active_rows[i] = 0.
     :param active_cols: same as active_rows but for columns.
     :param solution: a list provided which will hold the final solution.
+    :param solution_path: a list provided which will hold the execution path of the
+    algorithm.
     :return: True if the algorithm successfully found a solution.
     """
     # no active columns means the solution is found.
@@ -92,26 +97,31 @@ def solve(cover, cover_cpu, active_rows, active_cols, solution: list):
         return True
     # pick the column with the lest number of 1s. This is a heuristic to speed up the
     # algorithm (and is extremely effective for sudoku).
-    col, count = min_col(cover, active_rows, active_cols)
+    col, count = min_col(cover_gpu, active_rows, active_cols)
     # a column that doesn't contains 1s means no solution can be found and we backtrack.
     if count == 0:
-        print("backtrack!")
         return False
-    active_rows_np = np.array(active_rows)[np.flatnonzero(cover_cpu[active_rows, col])]
-    for row in active_rows_np:
-        solution.append(int(row))
+    # get all row indices that are active and have a 1 in this column. These rows are
+    # candidates for the final solution.
+    candidate_rows = np.array(active_rows)[np.flatnonzero(cover_cpu[active_rows, col])]
+    for row in candidate_rows:
+        solution.append(row)
+        solution_path.append((1, row))  # 1 denotes select this row
         # track removed rows and columns so we can easily add them back if we need
         # to backtrack
         rows_to_remove, cols_to_remove = select(
-            int(row), cover_cpu, active_rows, active_cols
+            row, cover_cpu, active_rows, active_cols
         )
         active_rows = np.setdiff1d(np.array(active_rows), rows_to_remove).tolist()
         active_cols = np.setdiff1d(np.array(active_cols), cols_to_remove).tolist()
-        solved = solve(cover, cover_cpu, active_rows, active_cols, solution)
+        solved = solve(
+            cover_gpu, cover_cpu, active_rows, active_cols, solution, solution_path
+        )
         if solved:
             return True
         # not solved: backtrack
         solution.pop()
+        solution_path.append((0, row))  # 1 denotes deselecting this row
         deselect(rows_to_remove, cols_to_remove, active_rows, active_cols)
 
 
@@ -156,52 +166,86 @@ def col_counts(cover, active_rows):
     return cp.sum(cover[active_rows, :], axis=0)
 
 
-def print_grid(grid):
-    for i in range(grid.shape[0]):
-        for j in range(grid.shape[1]):
-            print(grid[i, j] if grid[i, j] != 0 else "_", end=" ")
+def print_sudoku(s):
+    for i in range(s.shape[0]):
+        for j in range(s.shape[1]):
+            n = s[i, j]
+            if n == 0:
+                print("__", end=" ")
+            elif n < 10:
+                print(f" {n}", end=" ")
+            else:
+                print(n, end=" ")
         print()
+    print()
 
 
-def main():
-    # sudoku = np.array(
-    #     [
-    #         [0,18,15,9,0,21,0,0,0,0,0,0,22,1,0,0,5,0,14,0,12,0,0,13,7],
-    #         [23,0,0,4,0,0,0,11,0,0,0,25,24,0,0,18,0,0,20,0,6,0,0,0,0],
-    #         [],
-    #         [8, 3, 0, 6, 0, 0, 0, 0, 0],
-    #         [0, 0, 0, 9, 0, 0, 1, 0, 0],
-    #         [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    #         [5, 0, 7, 0, 0, 0, 3, 0, 0],
-    #         [0, 0, 0, 3, 0, 2, 0, 0, 0],
-    #         [1, 0, 0, 0, 0, 0, 0, 0, 0],
-    #     ]
-    # )
-    size = 5
-    sudoku = cp.zeros((size * size, size * size), dtype=cp.uint8)
-
+def solve_sudoku(sudoku: np.array, grid_width=9, block_width=3):
     cover, possibilities = create_cover(
-        sudoku, grid_width=size * size, block_width=size
+        sudoku, grid_width=grid_width, block_width=block_width
     )
     solution = []
+    solution_path = []
     start = timer()
     solved = solve(
+        cp.asarray(cover),
         cover,
-        cp.asnumpy(cover),
         list(range(cover.shape[0])),
         list(range(cover.shape[1])),
-        solution=solution,
+        solution,
+        solution_path,
     )
-    end = timer()
-    print(f"Solved in {end - start} seconds")
+    solving_time = timer() - start
     if solved:
-        for sol in solution:
-            row, col, n = possibilities[sol]
-            sudoku[row, col] = n
-        print_grid(sudoku)
-    else:
-        print("No solution exists :(")
+        completed_sudoku = build_final_sudoku(possibilities, solution, sudoku)
+        sudoku_solution_path = build_solving_path(possibilities, solution_path)
+        return completed_sudoku, solving_time, sudoku_solution_path
+    return None, solving_time, None
+
+
+def build_solving_path(possibilities, solution_path):
+    """
+    :return: an (operation_type, row, col, n) tuple list that represents the path
+    the algorithm took to solve the algorithm. "ins" means the algorithm inserted
+    number "n" into sudoku[row, col]
+    """
+    sudoku_solution_path = []
+    for action, cover_row in solution_path:
+        row, col, n = possibilities[cover_row]
+        if action == 1:
+            sudoku_solution_path.append(("ins", row, col, n))
+        else:
+            sudoku_solution_path.append(("rem", row, col, n))
+    return sudoku_solution_path
+
+
+def build_final_sudoku(possibilities, solution, sudoku):
+    """
+    :return: the completed sudoku
+    """
+    final = np.zeros_like(sudoku)
+    for sol in solution:
+        row, col, n = possibilities[sol]
+        final[row, col] = n
+    return final
 
 
 if __name__ == "__main__":
-    main()
+    _sudoku = np.zeros((16, 16), dtype=cp.uint8)
+    _completed_sudoku, _solving_time, _sudoku_solution_path = solve_sudoku(
+        _sudoku, grid_width=16, block_width=4
+    )
+    if _completed_sudoku is None:
+        print("No solution found :(")
+    else:
+        for _action, _row, _col, _n in _sudoku_solution_path:
+            os.system("cls")
+            if _action == "ins":
+                _sudoku[_row, _col] = _n
+                print_sudoku(_sudoku)
+            else:
+                _sudoku[_row, _col] = 0
+                print_sudoku(_sudoku)
+            time.sleep(0.1)
+        # print_grid(_sudoku)
+        print(f"solved in {_solving_time}")
