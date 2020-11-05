@@ -1,6 +1,5 @@
 import os
 import time
-from os import system
 from timeit import default_timer as timer
 
 import numpy as np
