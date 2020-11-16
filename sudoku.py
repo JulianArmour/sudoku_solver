@@ -224,9 +224,21 @@ def build_final_sudoku(possibilities, solution, sudoku):
 
 
 if __name__ == "__main__":
-    _sudoku = np.zeros((16, 16), dtype=np.uint8)
+    _sudoku = np.array(
+        [
+            [0, 5, 0, 0, 7, 0, 0, 8, 3],
+            [0, 0, 4, 0, 0, 0, 0, 6, 0],
+            [0, 0, 0, 0, 5, 0, 0, 0, 0],
+            [8, 3, 0, 6, 0, 0, 0, 0, 0],
+            [0, 0, 0, 9, 0, 0, 1, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [5, 0, 7, 0, 0, 0, 3, 0, 0],
+            [0, 0, 0, 3, 0, 2, 0, 0, 0],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0],
+        ]
+    )
     _completed_sudoku, _solving_time, _sudoku_solution_path = solve_sudoku(
-        _sudoku, grid_width=16, block_width=4
+        _sudoku, grid_width=9, block_width=3
     )
     if _completed_sudoku is None:
         print("No solution found :(")
@@ -239,6 +251,6 @@ if __name__ == "__main__":
             else:
                 _sudoku[_row, _col] = 0
                 print_sudoku(_sudoku)
-            time.sleep(0.05)
+            time.sleep(0.1)
         # print_grid(_sudoku)
         print(f"solved in {_solving_time}")

@@ -21,7 +21,7 @@ def create_cover(sudoku: np.array, grid_width=9, block_width=3):
     # There are 4 types of constraints and each type has g_len * g_len constraints
     n_constrains = 4 * g_len * g_len
     # cover stores the 0-1 relationships that Algorithm-X uses
-    cover = np.zeros((n_possibilities, n_constrains))
+    cover = np.zeros((n_possibilities, n_constrains), dtype=np.int8)
     # possibilities stores the 'name' of a possibility (row, col, number) such that
     # possibilities[i] is the name for row i in cover. This is used to fill in the
     # sudoku at the end
@@ -231,21 +231,21 @@ def build_final_sudoku(possibilities, solution, sudoku):
 
 
 if __name__ == "__main__":
-    _sudoku = np.zeros((16, 16), dtype=cp.uint8)
+    _sudoku = np.zeros((25, 25), dtype=cp.uint8)
     _completed_sudoku, _solving_time, _sudoku_solution_path = solve_sudoku(
-        _sudoku, grid_width=16, block_width=4
+        _sudoku, grid_width=25, block_width=5
     )
     if _completed_sudoku is None:
         print("No solution found :(")
     else:
-        for _action, _row, _col, _n in _sudoku_solution_path:
-            os.system("cls")
-            if _action == "ins":
-                _sudoku[_row, _col] = _n
-                print_sudoku(_sudoku)
-            else:
-                _sudoku[_row, _col] = 0
-                print_sudoku(_sudoku)
-            time.sleep(0.1)
-        # print_grid(_sudoku)
+        # for _action, _row, _col, _n in _sudoku_solution_path:
+        #     os.system("cls")
+        #     if _action == "ins":
+        #         _sudoku[_row, _col] = _n
+        #         print_sudoku(_sudoku)
+        #     else:
+        #         _sudoku[_row, _col] = 0
+        #         print_sudoku(_sudoku)
+        #     time.sleep(0.1)
+        print_sudoku(_completed_sudoku)
         print(f"solved in {_solving_time}")
