@@ -1,9 +1,8 @@
 import os
 import time
 from timeit import default_timer as timer
-
 import numpy as np
-
+from GUI import print_gui
 
 def create_cover(sudoku, grid_width=9, block_width=3):
     """
@@ -159,7 +158,6 @@ def min_col(cover, active_rows, active_cols):
 def col_counts(r, active_row_indices):
     return np.sum(r[active_row_indices, :], axis=0)
 
-
 def print_sudoku(s):
     for i in range(s.shape[0]):
         for j in range(s.shape[1]):
@@ -244,13 +242,15 @@ if __name__ == "__main__":
         print("No solution found :(")
     else:
         for _action, _row, _col, _n in _sudoku_solution_path:
-            os.system("cls")
+            os.system("clear")
             if _action == "ins":
                 _sudoku[_row, _col] = _n
-                print_sudoku(_sudoku)
+                # print_sudoku(_sudoku)
+                print_gui(_sudoku)
             else:
                 _sudoku[_row, _col] = 0
-                print_sudoku(_sudoku)
+                # print_sudoku(_sudoku)
+                print_gui(_sudoku)
             time.sleep(0.1)
         # print_grid(_sudoku)
         print(f"solved in {_solving_time}")
