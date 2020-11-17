@@ -59,10 +59,14 @@ def print_gui(s):
     board = Grid(s.shape[0], s.shape[0], 540, 540, win, s)
     redraw_window(win, board, 0)
     pygame.display.update()
+    return win
 
-# win = None
-def main():
-    win = pygame.display.set_mode((540,600))
-    pygame.display.set_caption("Sudoku")
+def write_Time(win, time):
+    fnt = pygame.font.SysFont("comicsans", 40)
+    text = fnt.render("Solved in " + time, 1, (0,0,0))
+    win.blit(text, (5, 560))
+    pygame.display.update()
 
-main()
+pygame.display.set_mode((540,600))
+pygame.display.set_caption("Sudoku")
+
