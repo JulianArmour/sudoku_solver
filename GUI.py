@@ -1,7 +1,9 @@
+from os import environ
+environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import pygame
+import os
 import time
-
-pygame.font.init()
+# os.environ['SDL_VIDEO_CENTERED'] = '1'
 
 class Grid:
     def __init__(self, rows, cols, width, height, win, brd):
@@ -65,8 +67,10 @@ def write_Time(win, time):
     fnt = pygame.font.SysFont("comicsans", 40)
     text = fnt.render("Solved in " + time, 1, (0,0,0))
     win.blit(text, (5, 560))
-    pygame.display.update()
+    pygame.display.update()    
 
-pygame.display.set_mode((540,600))
-pygame.display.set_caption("Sudoku")
-
+# pygame.font.init()
+def init_GUI():
+    pygame.font.init()
+    pygame.display.set_mode((540,600))
+    pygame.display.set_caption("Sudoku")

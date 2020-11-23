@@ -2,7 +2,7 @@ import os
 import time
 from timeit import default_timer as timer
 import numpy as np
-from GUI import print_gui, write_Time
+from GUI import print_gui, write_Time, init_GUI
 
 def create_cover(sudoku, grid_width=9, block_width=3):
     """
@@ -220,8 +220,9 @@ def build_final_sudoku(possibilities, solution, sudoku):
         final[row, col] = n
     return final
 
-
-if __name__ == "__main__":
+def main():
+    if GUI_enabled == "1":
+        init_GUI()
     _sudoku = np.array(
         [
             [0, 5, 0, 0, 7, 0, 0, 8, 3],
@@ -246,14 +247,20 @@ if __name__ == "__main__":
             os.system("clear")
             if _action == "ins":
                 _sudoku[_row, _col] = _n
-                # print_sudoku(_sudoku)
-                window = print_gui(_sudoku)
+                window = print_gui(_sudoku) if GUI_enabled == "1" else print_sudoku(_sudoku)
             else:
                 _sudoku[_row, _col] = 0
-                # print_sudoku(_sudoku)
-                window = print_gui(_sudoku)
+                window = print_gui(_sudoku) if GUI_enabled == "1" else print_sudoku(_sudoku)
             time.sleep(0.1)
         # print_grid(_sudoku)
-    write_Time(window, str(_solving_time)[:7] + ' Seconds')
-    time.sleep(6)
+    if GUI_enabled == "1": 
+        write_Time(window, str(_solving_time)[:7] + ' seconds')
+        time.sleep(6)
     print(f"solved in {_solving_time}")
+
+if __name__ == "__main__":
+    while True:
+        GUI_enabled = input('For GUI, type 1\nFor CLI, type 2\n')
+        if GUI_enabled in ["1","2"]: 
+            break
+    main()    
