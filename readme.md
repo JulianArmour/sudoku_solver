@@ -1,4 +1,4 @@
-#Readme/Installation and Usage
+<h1>Readme/Installation and Usage</h1>
 
 Running this program requires Python, which can be downloaded here:
 https://www.python.org/downloads/
